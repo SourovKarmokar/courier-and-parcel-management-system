@@ -6,7 +6,7 @@ const crypto = require("crypto")
 
 function registrationController(req,res) {
     console.log(req.body);
-    const {firstName,lastName,email,password} = req.body
+    const {firstName,lastName,email,password ,role} = req.body
     if(!firstName){
         return res.json("FirstName is Require")
     }
@@ -34,6 +34,7 @@ function registrationController(req,res) {
         lastName: lastName,
         email: email,
         password: hash,
+        role: role || "user",
         otp: otp,
         otpExpire:otpExpire,
     })
