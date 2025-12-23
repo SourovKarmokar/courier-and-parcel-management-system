@@ -10,25 +10,33 @@ const parcelSchema = new Schema({
   parcelWeight: { type: Number, required: true }, 
   parcelType: { type: String, required: true }, 
   deliveryCharge: { type: Number, required: true },
-  //traking system 
-  trackingId:{type: String , unique: true},
+
+
+  // Tracking system 
+  trackingId: { type: String, unique: true },
   status: {
     type: String,
-   enum: ["pending", "assigned", "picked", "delivered", "cancelled"], 
+    enum: ["pending", "assigned", "picked", "delivered", "cancelled"], 
     default: "pending"
   },
-
-  //(customer) Booking
-  senderId:{
+  
+  assignedBy: {
     type: Schema.Types.ObjectId,
-    ref: "userList",
-    require:true,
+    ref: "userList"  // ✅ ঠিক আছে
   },
-  //Assigned Delivery Man
-  ddeliveryManId: {
+
+  // (customer) Booking
+  senderId: {
     type: Schema.Types.ObjectId,
-    ref: "userList"
+    ref: "userList", // ✅ ঠিক আছে
+    required: true,
+  },
+  
+  // Assigned Delivery Man
+  deliveryManId: {
+    type: Schema.Types.ObjectId,
+    ref: "userList" // ✅ ঠিক আছে
   }
 }, { timestamps: true });
   
-  module.exports = mongoose.model("Parcel", parcelSchema);
+module.exports = mongoose.model("Parcel", parcelSchema);

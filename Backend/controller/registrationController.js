@@ -6,7 +6,7 @@ const crypto = require("crypto")
 
 function registrationController(req,res) {
     console.log(req.body);
-    const {firstName,lastName,email,password ,role} = req.body
+    const {firstName,lastName,email,password ,role ,phone} = req.body
     if(!firstName){
         return res.json("FirstName is Require")
     }
@@ -22,6 +22,8 @@ function registrationController(req,res) {
     if(!password){
         return res.json("Password is Require")
     }
+    if (!phone) return res.json({ error: "Phone is Required" });
+
     const otp = crypto.randomInt(10000,99999).toString()
     
     const otpExpire = new Date(Date.now()+ 10 * 60 * 1000)
@@ -37,6 +39,7 @@ function registrationController(req,res) {
         role: role || "user",
         otp: otp,
         otpExpire:otpExpire,
+        phone:phone,
     })
 
      user.save()
