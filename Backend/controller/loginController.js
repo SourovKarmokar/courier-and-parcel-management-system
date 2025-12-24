@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 var jwt = require('jsonwebtoken');
 
 async function loginController(req,res){
-    const {email, password} =req.body
+    const {email, password} = req.body
 
      if(!email){
         return res.json("Email is Require")
@@ -20,15 +20,13 @@ async function loginController(req,res){
     if(!existingUser){
         return res.json({error: "This email is not registered"})
     }
-    console.log(existingUser);
+    
     if(!existingUser.verified){
         return res.json({error:"This email is not verified"})
     }
 
     const isMatched = await bcrypt.compare(password, existingUser.password)
-    console.log(isMatched);
     
-
     const accessToken = jwt.sign(
         {
             userid: existingUser._id,
@@ -38,20 +36,27 @@ async function loginController(req,res){
         },
         "api2406mern",
         {
-            expiresIn: "10m"
+            expiresIn: "1d"
         }
     )
+
     if(!isMatched){
         res.json({
             error: "Password is not matched"
         })
-    }else{
+    } else {
+       
         res.json({
             success: "Login successfully Done",
-            accessToken: accessToken
+            accessToken: accessToken,
+            user: {
+                id: existingUser._id,
+                firstName: existingUser.firstName,
+                lastName: existingUser.lastName,
+                email: existingUser.email,
+                role: existingUser.role, 
+            }
         })
     }   
-
-    
 }
 module.exports = loginController

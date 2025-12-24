@@ -1,6 +1,6 @@
 const emailVerification = require("../helpers/emailVerification");
 const userSchema = require("../model/userSchema");
-const crypto = require("crypto")
+const crypto = require("crypto");
 
 async function otpController(req, res) {
   try {
@@ -22,60 +22,50 @@ async function otpController(req, res) {
       });
     }
 
-    console.log("User:", user.email);
-    console.log("Stored OTP:", user.otp, "Provided OTP:", otp);
+    // ❌ আগে এখানে verified চেক ছিল, এখন সেটা বাদ দেওয়া হলো
+    // কারণ Forgot Password এর সময় ইউজার Verified থাকে।
 
-    // ৩. Already verified check (return যোগ করুন!)
-    if (user.verified) {
-      return res.status(400).json({
-        error: "This email is already verified"
-      });
-    }
-
-    // ৪. OTP আছে কিনা check
+    // ৩. OTP আছে কিনা check
     if (!user.otp || !user.otpExpire) {
       return res.status(400).json({
         error: "No OTP found. Please request a new OTP"
       });
     }
 
-    // ৫. OTP expire check
+    // ৪. OTP expire check
     if (user.otpExpire < Date.now()) {
       return res.status(400).json({
         error: "OTP has expired. Please request a new OTP"
       });
     }
 
-    // ৬. OTP match check (String এ convert করুন)
+    // ৫. OTP match check
     if (String(user.otp) !== String(otp)) {
       return res.status(400).json({
         error: "Invalid OTP"
       });
     }
 
-    // ৭. User verify করুন
+    // ৬. User verify করুন (এবং OTP ক্লিয়ার করুন)
+    // Forgot Password এর সময় Verified: true থাকলে সমস্যা নেই, আবার true সেট হবে।
     const userVerify = await userSchema.findOneAndUpdate(
       { email },
       {
         $set: { verified: true },
-        $unset: { otp: "", otpExpire: "" }
+        $unset: { otp: "", otpExpire: "" } // কাজ শেষ, তাই OTP মুছে ফেলছি
       },
       {
         new: true,
-        select: "-password" // password response এ পাঠাবেন না
+        select: "-password"
       }
     );
 
-    console.log("✅ User verified:", userVerify.email);
-
-    // ৮. Success response পাঠান
+    // ৭. Success response পাঠান
     return res.status(200).json({
       success: true,
-      message: "Email verified successfully",
+      message: "OTP Verified Successfully",
       user: {
         email: userVerify.email,
-        firstName: userVerify.firstName,
-        lastName: userVerify.lastName,
         verified: userVerify.verified
       }
     });
@@ -90,9 +80,7 @@ async function otpController(req, res) {
 
 async function resendOtpController(req, res) {
   try {
-    console.log("Resend OTP Request");
     const { email } = req.body;
-    console.log("Email:", email);
 
     // ১. Validation
     if (!email) {
@@ -110,21 +98,15 @@ async function resendOtpController(req, res) {
       });
     }
 
-    // ৩. Already verified check
-    if (user.verified) {
-      return res.status(400).json({
-        error: "This email is already verified"
-      });
-    }
+    // ❌ সমস্যা ছিল এখানে! (Verified চেক বাদ দিয়েছি)
+    // Forgot Password-এর জন্য Verified ইউজারেরও OTP দরকার হয়।
 
-    // ৪. Generate new OTP (6 digit)
+    // ৩. Generate new OTP (6 digit)
     const otp = crypto.randomInt(100000, 999999).toString();
     const otpExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
 
-    console.log("Generated OTP:", otp);
-
-    // ৫. Update user with new OTP (await করুন!)
-    const updatedUser = await userSchema.findOneAndUpdate(
+    // ৪. Update user with new OTP
+    await userSchema.findOneAndUpdate(
       { email },
       {
         $set: {
@@ -132,31 +114,24 @@ async function resendOtpController(req, res) {
           otpExpire: otpExpire
         }
       },
-      {
-        new: true
-      }
+      { new: true }
     );
 
-    console.log("OTP updated for:", updatedUser.email);
-
-    // ৬. Send email (await করুন!)
+    // ৫. Send email
     await emailVerification(email, otp);
 
-    console.log("✅ OTP email sent to:", email);
-
-    // ৭. Success response
+    // ৬. Success response
     return res.status(200).json({
       success: true,
-      message: "OTP has been resent to your email"
+      message: "OTP has been sent to your email"
     });
 
   } catch (error) {
     console.error("❌ Resend OTP Error:", error);
     return res.status(500).json({
-      error: "Failed to resend OTP. Please try again"
+      error: "Failed to send OTP. Please try again"
     });
   }
 }
 
-
-module.exports = {otpController ,resendOtpController};
+module.exports = { otpController, resendOtpController };

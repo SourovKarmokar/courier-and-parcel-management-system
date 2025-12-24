@@ -6,7 +6,8 @@ const { checkLogin, checkRole } = require("../../middleware/authMiddleware");
 const { 
   getAllParcels, 
   getAllDeliveryMan, 
-  assignAgent 
+  assignAgent, 
+  getDashboardStats
 } = require("../../controller/adminController");
 
 
@@ -19,5 +20,7 @@ router.get("/all-agents", checkLogin, checkRole(["admin"]), getAllDeliveryMan);
 
 // ৩. এজেন্ট এসাইন করা (Only Admin)
 router.put("/assign", checkLogin, checkRole(["admin"]), assignAgent);
+// ৪. ড্যাশবোর্ড স্ট্যাটাস (Only Admin)
+router.get("/dashboard-stats", checkLogin, checkRole(["admin"]), getDashboardStats);
 
 module.exports = router;
