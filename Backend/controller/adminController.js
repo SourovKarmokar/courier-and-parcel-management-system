@@ -1,109 +1,136 @@
 const Parcel = require("../model/parcelSchema");
 const User = require("../model/userSchema");
 
-// 1. See all Parcel by Admin
+// ================= ALL PARCELS =================
 exports.getAllParcels = async (req, res) => {
-    try {
-        const parcels = await Parcel.find()
-            .populate("senderId", "firstName email")
-            .populate("deliveryManId", "firstName phone") 
-            .populate("assignedBy", "firstName email") 
-            .sort({ createdAt: -1 });
+  try {
+    const parcels = await Parcel.find()
+      .populate("senderId", "firstName email")
+      .populate("deliveryManId", "firstName phone")
+      .populate("assignedBy", "firstName email")
+      .sort({ createdAt: -1 });
 
-        res.status(200).json(parcels);
-
-    } catch (error) {
-        console.log(error); 
-        res.status(500).json({ error: "Failed to fetch parcels" });
-    }
+    res.status(200).json(parcels);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch parcels" });
+  }
 };
 
-// 2. See All Delivery Agents
+// ================= ALL AGENTS =================
 exports.getAllDeliveryMan = async (req, res) => {
-    try {
-        const agents = await User.find({ role: "agent" }).select("-password");
-        res.status(200).json(agents);
-    } catch (error) {
-        res.status(500).json({ error: "Failed to fetch agents" });
-    }
+  try {
+    const agents = await User.find({ role: "agent" }).select("-password");
+    res.status(200).json(agents);
+  } catch {
+    res.status(500).json({ error: "Failed to fetch agents" });
+  }
 };
 
-// 3. Assign Agent
+// ================= ASSIGN AGENT =================
 exports.assignAgent = async (req, res) => {
-    try {
-        const { parcelId, agentId } = req.body;
-        const adminId = req.userid; 
+  try {
+    const { parcelId, agentId } = req.body;
+    const adminId = req.userid;
 
-        const updatedParcel = await Parcel.findByIdAndUpdate(
-            parcelId,
-            {
-                deliveryManId: agentId,
-                status: "assigned",
-                assignedBy: adminId 
-            },
-            { new: true }
-        );
+    const parcel = await Parcel.findByIdAndUpdate(
+      parcelId,
+      {
+        deliveryManId: agentId,
+        status: "assigned",
+        assignedBy: adminId,
+      },
+      { new: true }
+    ).populate("deliveryManId", "firstName");
 
-        if (!updatedParcel) {
-            return res.status(404).json({ error: "Parcel not found" });
-        }
-
-        await User.findByIdAndUpdate(
-            adminId,
-            { 
-                $addToSet: { "adminDetails.assignedAgents": agentId } 
-            }
-        );
-
-        res.status(200).json({
-            message: "Agent assigned successfully and saved to Admin profile!",
-            data: updatedParcel
-        });
-
-    } catch (error) {
-        console.log(error);
-        res.status(500).json({ error: "Assignment failed" });
+    if (!parcel) {
+      return res.status(404).json({ error: "Parcel not found" });
     }
+
+    const io = req.app.get("io");
+
+    // 🔥 REALTIME → AGENT
+    io.to(`agent_${agentId}`).emit("new-job-assigned", {
+      parcel,
+    });
+
+    // 🔥 REALTIME → ADMIN (optional)
+    io.emit("parcel-updated", {
+      parcelId,
+      status: "assigned",
+      agentName: parcel.deliveryManId.firstName,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: parcel,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Assign failed" });
+  }
 };
 
-// 4. Dashboard Stats (নাম ঠিক করা হয়েছে)
-exports.getDashboardStats = async (req , res) => {
-    try{
-        // Total Parcel (Variable নাম ঠিক করা হয়েছে)
-        const totalParcels = await Parcel.countDocuments();
-        
-        // Status অনুযায়ী count
-        const deliveredParcels = await Parcel.countDocuments({ status: "delivered" });
-        const pendingParcels = await Parcel.countDocuments({ status: "pending" });
-        const cancelledParcels = await Parcel.countDocuments({ status: "cancelled" });
 
-        // Total User and Agent
-        const totalAgents = await User.countDocuments({ role: "agent" });
-        const totalCustomers = await User.countDocuments({ role: "customer" });
+// ===============================
+// GET ALL USERS
+// ===============================
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find().select("-password").sort({ createdAt: -1 });
+    res.json({ success: true, data: users });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load users" });
+  }
+};
 
-        // Total Revenue and Delivered Parcel
-        const revenueData = await Parcel.aggregate([
-            { $match: { status: "delivered" } },
-            { $group: { _id: null, totalRevenue: { $sum: "$deliveryCharge" } } }
-        ]);
+// ===============================
+// DELETE USER
+// ===============================
+exports.deleteUser = async (req, res) => {
+  try {
+    await User.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: "User deleted" });
+  } catch (err) {
+    res.status(500).json({ error: "Delete failed" });
+  }
+};
 
-        const totalRevenue = revenueData.length > 0 ? revenueData[0].totalRevenue : 0;
 
-        res.status(200).json({
-            success: true,
-            data: {
-                totalParcels,      // ✅ এখন নাম মিলবে
-                deliveredParcels,
-                pendingParcels,
-                cancelledParcels,
-                totalAgents,
-                totalCustomers,
-                totalRevenue 
-            }
-        });
+// ===============================
+// UPDATE USER ROLE
+// ===============================
+exports.updateUserRole = async (req, res) => {
+  try {
+    const { role } = req.body;
+    const userId = req.params.id;
 
-    } catch (error) { 
-        console.log(error);
-        res.status(500).json({ error: "Failed to fetch dashboard stats" });
+    if (!["admin", "agent", "customer"].includes(role)) {
+      return res.status(400).json({ error: "Invalid role" });
     }
-}
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { role },
+      { new: true }
+    ).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // 🔥 REALTIME EVENT
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("user-role-updated", {
+        userId: user._id,
+        role: user.role,
+      });
+    }
+
+    res.json({ success: true, data: user });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Role update failed" });
+  }
+};
+

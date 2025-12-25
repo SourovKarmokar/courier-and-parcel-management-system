@@ -53,10 +53,19 @@ const parcelSchema = new Schema({
 
   // ৫. Status & Assignment
   status: {
-    type: String,
-    enum: ["pending", "assigned", "picked", "delivered", "cancelled"], 
-    default: "pending"
-  },
+  type: String,
+  enum: [
+    "pending",
+    "assigned",
+    "picked_up",
+    "in_transit",
+    "delivered",
+    "failed",
+    "cancelled"
+  ],
+  default: "pending"
+},
+
   
   // পরে অ্যাডমিন যখন অ্যাসাইন করবে তখন এগুলো লাগবে
   deliveryManId: {

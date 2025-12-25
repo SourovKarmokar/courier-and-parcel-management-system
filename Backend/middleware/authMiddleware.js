@@ -10,6 +10,7 @@ const checkLogin = (req, res, next) => {
         
         // Token Validation
         const decoder = jwt.verify(token, "api2406mern");
+        console.log("🔐 LOGIN USER:", decoder);
         
         // Token thake data bar kore request e rakha
         const { firstName, email, userid, role } = decoder;

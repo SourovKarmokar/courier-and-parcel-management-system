@@ -7,8 +7,8 @@ import "react-toastify/dist/ReactToastify.css";
 const Register = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState(1); // ১ = রেজিস্ট্রেশন, ২ = OTP ভেরিফিকেশন
-  const [otp, setOtp] = useState(""); // OTP রাখার জন্য
+  const [step, setStep] = useState(1); // 1 = Register, 2 = OTP
+  const [otp, setOtp] = useState("");
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -23,142 +23,194 @@ const Register = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // ১. রেজিস্ট্রেশন সাবমিট ফাংশন
+  // ================= REGISTER =================
   const handleRegister = async (e) => {
     e.preventDefault();
+
     if (formData.password !== formData.confirmPassword) {
       return toast.error("Passwords do not match!");
     }
 
     setLoading(true);
     try {
-      const {  ...registerData } = formData;
-      const response = await axios.post("http://localhost:3000/api/v1/authentication/registration", registerData);
+      const res = await axios.post(
+        "http://localhost:3000/api/v1/authentication/registration",
+        formData
+      );
 
-      if (response.data.message === "Registration Successfull") {
-        toast.success("Registration Successful! Check your email for OTP.");
-        setStep(2); // ✅ সফল হলে ২য় ধাপে (OTP ইনপুট) পাঠাবে
+      if (res.data.message === "Registration Successfull") {
+        toast.success("Registration successful! Check email for OTP");
+        setStep(2);
       } else {
-        toast.error(response.data.error || "Registration Failed");
+        toast.error(res.data.error || "Registration failed");
       }
-    } catch {
-      toast.error("Server Error. Please try again.");
+    } catch  {
+      toast.error("Server error. Try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  // ২. OTP ভেরিফিকেশন ফাংশন
+  // ================= VERIFY OTP =================
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      const response = await axios.post("http://localhost:3000/api/v1/authentication/verifybyotp", {
-        email: formData.email, // রেজিস্ট্রেশন ফর্ম থেকে ইমেইল নিচ্ছে
-        otp: otp
-      });
 
-      if (response.data.success) {
-        toast.success("Account Verified Successfully!");
-        
-        // ✅ ভেরিফিকেশন হলে ২ সেকেন্ড পর লগইন পেজে পাঠিয়ে দিবে
-        setTimeout(() => {
-          navigate("/login");
-        }, 2000);
+    try {
+      const res = await axios.post(
+        "http://localhost:3000/api/v1/authentication/verifybyotp",
+        {
+          email: formData.email,
+          otp: otp,
+        }
+      );
+
+      if (res.data.success) {
+        toast.success("Account verified successfully!");
+        setTimeout(() => navigate("/login"), 2000);
       } else {
         toast.error("Invalid OTP");
       }
-    } catch {
-      toast.error("Verification failed. Check OTP again.");
+    } catch  {
+      toast.error("OTP verification failed");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ================= RESEND OTP =================
+  const handleResendOtp = async () => {
+    try {
+      const res = await axios.post(
+        "http://localhost:3000/api/v1/authentication/resendotp",
+        { email: formData.email }
+      );
+
+      toast.success(res.data.message || "OTP resent successfully!");
+    } catch (error) {
+      toast.error(
+        error.response?.data?.error || "Failed to resend OTP"
+      );
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 py-10 sm:px-6 lg:px-8">
+    <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 py-10">
       <ToastContainer position="top-center" />
-      
-      <div className="w-full max-w-md space-y-8 bg-white p-8 rounded-xl shadow-lg">
-        <div className="text-center">
-          <h2 className="mt-2 text-3xl font-extrabold text-gray-900">
+
+      <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-lg">
+        <div className="text-center mb-6">
+          <h2 className="text-3xl font-bold text-gray-900">
             {step === 1 ? "Create Account" : "Verify Account"}
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            {step === 1 ? "Join us to book parcels" : `Enter the OTP sent to ${formData.email}`}
+          <p className="text-sm text-gray-600 mt-2">
+            {step === 1
+              ? "Join us to book parcels"
+              : `Enter the OTP sent to ${formData.email}`}
           </p>
         </div>
 
-        {/* 🔄 কন্ডিশনাল রেন্ডারিং */}
-        {step === 1 ? (
-          // ============ FORM 1: REGISTRATION ============
-          <form className="mt-8 space-y-6" onSubmit={handleRegister}>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">First Name</label>
-                  <input name="firstName" type="text" required className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" onChange={handleChange} />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Last Name</label>
-                  <input name="lastName" type="text" required className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" onChange={handleChange} />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Email Address</label>
-                <input name="email" type="email" required className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" onChange={handleChange} />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Phone Number</label>
-                <input name="phone" type="tel" required className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" onChange={handleChange} />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Password</label>
-                <input name="password" type="password" required className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" onChange={handleChange} />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Confirm Password</label>
-                <input name="confirmPassword" type="password" required className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" onChange={handleChange} />
-              </div>
-            </div>
-
-            <button type="submit" disabled={loading} className="w-full justify-center rounded-md bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 transition-all disabled:bg-blue-300">
-              {loading ? "Creating Account..." : "Register"}
-            </button>
-          </form>
-        ) : (
-          // ============ FORM 2: OTP VERIFICATION ============
-          <form className="mt-8 space-y-6" onSubmit={handleVerifyOtp}>
-            <div>
-              <label className="text-sm font-medium text-gray-700">One Time Password (OTP)</label>
-              <input 
-                type="text" 
-                required 
-                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-center text-xl tracking-widest focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="123456"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
+        {/* ================= STEP 1: REGISTER ================= */}
+        {step === 1 && (
+          <form onSubmit={handleRegister} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <input
+                name="firstName"
+                placeholder="First Name"
+                required
+                onChange={handleChange}
+                className="input"
+              />
+              <input
+                name="lastName"
+                placeholder="Last Name"
+                required
+                onChange={handleChange}
+                className="input"
               />
             </div>
 
-            <button type="submit" disabled={loading} className="w-full justify-center rounded-md bg-green-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-green-500 transition-all disabled:bg-green-300">
-              {loading ? "Verifying..." : "Verify & Login"}
+            <input
+              name="email"
+              type="email"
+              placeholder="Email Address"
+              required
+              onChange={handleChange}
+              className="input"
+            />
+
+            <input
+              name="phone"
+              placeholder="Phone Number"
+              required
+              onChange={handleChange}
+              className="input"
+            />
+
+            <input
+              name="password"
+              type="password"
+              placeholder="Password"
+              required
+              onChange={handleChange}
+              className="input"
+            />
+
+            <input
+              name="confirmPassword"
+              type="password"
+              placeholder="Confirm Password"
+              required
+              onChange={handleChange}
+              className="input"
+            />
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn"
+            >
+              {loading ? "Creating Account..." : "Register"}
             </button>
           </form>
         )}
 
-        <div className="text-center">
-          <p className="text-sm text-gray-600">
-            Already have an account?{" "}
-            <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
-              Sign in
-            </Link>
-          </p>
-        </div>
+        {/* ================= STEP 2: OTP ================= */}
+        {step === 2 && (
+          <form onSubmit={handleVerifyOtp} className="space-y-4">
+            <input
+              type="text"
+              placeholder="Enter OTP"
+              required
+              value={otp}
+              onChange={(e) => setOtp(e.target.value)}
+              className="input text-center text-xl tracking-widest"
+            />
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn bg-green-600 hover:bg-green-500"
+            >
+              {loading ? "Verifying..." : "Verify OTP"}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleResendOtp}
+              className="w-full text-sm text-blue-600 hover:underline"
+            >
+              Resend OTP
+            </button>
+          </form>
+        )}
+
+        <p className="text-sm text-center mt-6">
+          Already have an account?{" "}
+          <Link to="/login" className="text-blue-600 font-medium">
+            Sign in
+          </Link>
+        </p>
       </div>
     </div>
   );

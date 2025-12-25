@@ -1,47 +1,56 @@
 const Parcel = require("../model/parcelSchema");
 
-// ১. আমার কাজগুলো দেখা (Get My Jobs)
+// ===============================
+// Agent: My Assigned Jobs
+// ===============================
 exports.getMyJobs = async (req, res) => {
   try {
-    // লগইন করা এজেন্টের ID (req.userid) দিয়ে পার্সেল খুঁজবো
-    const myParcels = await Parcel.find({ deliveryManId: req.userid })
-      .populate("senderId", "firstName email phone") // সেন্ডারের তথ্য
-      .populate("assignedBy", "firstName email") // কোন এডমিন দিয়েছে
+    const jobs = await Parcel.find({
+      deliveryManId: req.userid,
+    })
+      .populate("senderId", "firstName email phone")
       .sort({ createdAt: -1 });
 
-    res.status(200).json(myParcels);
-  } catch (error) {
+    res.json({ success: true, data: jobs });
+  } catch (err) {
     res.status(500).json({ error: "Failed to get jobs" });
   }
 };
 
-// ২. স্ট্যাটাস আপডেট করা (Update Delivery Status)
+// ===============================
+// Agent: Update Delivery Status
+// ===============================
 exports.updateDeliveryStatus = async (req, res) => {
   try {
     const { parcelId, status } = req.body;
 
-    // স্ট্যাটাস ভ্যালিডেশন
-    const validStatuses = ["picked", "delivered", "cancelled"];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({ error: "Invalid status update" });
+    const valid = ["picked_up", "in_transit", "delivered", "failed"];
+    if (!valid.includes(status)) {
+      return res.status(400).json({ error: "Invalid status" });
     }
 
-    const updatedParcel = await Parcel.findByIdAndUpdate(
-      parcelId,
-      { status: status },
+    const parcel = await Parcel.findOneAndUpdate(
+      { _id: parcelId, deliveryManId: req.userid },
+      { status },
       { new: true }
     );
 
-    if (!updatedParcel) {
+    if (!parcel) {
       return res.status(404).json({ error: "Parcel not found" });
     }
 
-    res.status(200).json({
-      message: "Status updated successfully!",
-      data: updatedParcel
+    // 🔥 REALTIME to CUSTOMER
+    const io = req.app.get("io");
+    io?.to(`customer_${parcel.senderId}`).emit("parcel-status-updated", {
+      parcelId: parcel._id,
+      status: parcel.status,
     });
 
-  } catch (error) {
+    console.log(`📡 Realtime sent to customer_${parcel.senderId}`);
+
+    res.json({ success: true, data: parcel });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Update failed" });
   }
 };

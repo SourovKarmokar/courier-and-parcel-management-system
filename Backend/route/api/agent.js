@@ -1,12 +1,27 @@
 const express = require("express");
 const router = express.Router();
+
 const { checkLogin, checkRole } = require("../../middleware/authMiddleware");
-const { getMyJobs, updateDeliveryStatus } = require("../../controller/agentController");
+const agentController = require("../../controller/agentController");
 
-// ১. আমার কাজ দেখা (Only Agent)
-router.get("/my-jobs", checkLogin, checkRole(["agent"]), getMyJobs);
+// ===============================
+// Agent Routes
+// ===============================
 
-// ২. স্ট্যাটাস আপডেট করা (Only Agent)
-router.put("/update-status", checkLogin, checkRole(["agent"]), updateDeliveryStatus);
+// 1️⃣ Agent: My Assigned Jobs
+router.get(
+  "/my-jobs",
+  checkLogin,
+  checkRole(["agent"]),
+  agentController.getMyJobs
+);
+
+// 2️⃣ Agent: Update Delivery Status
+router.put(
+  "/update-status",
+  checkLogin,
+  checkRole(["agent"]),
+  agentController.updateDeliveryStatus
+);
 
 module.exports = router;
